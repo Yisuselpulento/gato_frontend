@@ -11,7 +11,7 @@ export default function App() {
   const [chat, setChat] = useState([]);
   const [msg, setMsg] = useState("");
 
-   const isMyTurn = symbol === turn && !gameEnded;
+  const isMyTurn = symbol === turn && !gameEnded;
 
   useEffect(() => {
     socket.on("playerData", ({ symbol }) => {
@@ -48,9 +48,6 @@ export default function App() {
     };
   }, [symbol]);
 
-
-
-
   const play = (i) => {
     if (!isMyTurn) return;
     socket.emit("play", i);
@@ -64,7 +61,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center gap-6 p-4">
-
       <h1 className="text-3xl font-bold">Tic Tac Toe</h1>
 
       <p>Tu símbolo: <b>{symbol ?? "?"}</b></p>
@@ -72,16 +68,16 @@ export default function App() {
 
       <div className="grid grid-cols-3 gap-3">
         {board.map((cell, i) => (
-         <button
-          key={i}
-          onClick={() => play(i)}
-          disabled={cell || !isMyTurn}
-          className={`w-24 h-24 bg-slate-800 rounded-xl text-5xl font-bold ${
-            cell === "O" ? "text-blue-400" : cell === "X" ? "text-red-500" : "text-white"
-          }`}
-        >
-          {cell}
-        </button>
+          <button
+            key={i}
+            onClick={() => play(i)}
+            disabled={cell || !isMyTurn}
+            className={`w-24 h-24 bg-slate-800 rounded-xl text-5xl font-bold ${
+              cell === "O" ? "text-blue-400" : cell === "X" ? "text-red-500" : "text-white"
+            }`}
+          >
+            {cell}
+          </button>
         ))}
       </div>
 
@@ -113,7 +109,6 @@ export default function App() {
           </button>
         </div>
       </div>
-
     </div>
   );
 }
