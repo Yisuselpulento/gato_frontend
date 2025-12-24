@@ -2,71 +2,57 @@ import { useEffect, useState } from "react";
 import socket from "./socket";
 
 export default function App() {
-  const [board, setBoard] = useState(() => Array(9).fill(null));
+  const [board, setBoard] = useState(Array(9).fill(null));
   const [turn, setTurn] = useState("O");
-  const [symbol, setSymbol] = useState("");
+  const [symbol, setSymbol] = useState(null);
+  const [gameEnded, setGameEnded] = useState(false);
+  const [result, setResult] = useState(null);
+
   const [chat, setChat] = useState([]);
   const [msg, setMsg] = useState("");
-  const [result, setResult] = useState(null);
-  const [gameEnded, setGameEnded] = useState(false);
 
-  /* =======================
-     SOCKET EVENTS
-  ======================= */
+   const isMyTurn = symbol === turn && !gameEnded;
+
   useEffect(() => {
-    const onPlayerData = ({ symbol }) => {
+    socket.on("playerData", ({ symbol }) => {
       setSymbol(symbol);
-    };
+    });
 
-    const onGameState = ({ board, turn }) => {
-      if (Array.isArray(board)) setBoard(board);
+    socket.on("gameState", ({ board, turn, gameEnded }) => {
+      setBoard(board);
       setTurn(turn);
-    };
+      setGameEnded(gameEnded);
+    });
 
-    const onChat = (msg) => {
-      setChat(c => [...c, msg]);
-    };
-
-    const onGameOver = ({ winner, board }) => {
-      if (Array.isArray(board)) setBoard(board);
+    socket.on("gameOver", ({ winner, board }) => {
+      setBoard(board);
       setGameEnded(true);
 
       if (winner === "draw") setResult("draw");
       else if (winner === symbol) setResult("win");
       else setResult("lose");
-    };
+    });
 
-    const onGameReset = () => {
+    socket.on("gameReset", () => {
       setBoard(Array(9).fill(null));
-      setTurn("O");
-      setResult(null);
       setGameEnded(false);
-      setChat([]);
-    };
+      setResult(null);
+    });
 
-    socket.on("playerData", onPlayerData);
-    socket.on("gameState", onGameState);
-    socket.on("chat", onChat);
-    socket.on("gameOver", onGameOver);
-    socket.on("gameReset", onGameReset);
-    socket.on("roomFull", () => alert("Sala llena"));
+    socket.on("chat", (msg) => {
+      setChat(prev => [...prev, msg]);
+    });
 
     return () => {
-      socket.off("playerData", onPlayerData);
-      socket.off("gameState", onGameState);
-      socket.off("chat", onChat);
-      socket.off("gameOver", onGameOver);
-      socket.off("gameReset", onGameReset);
-      socket.off("roomFull");
+      socket.off();
     };
   }, [symbol]);
 
-  /* =======================
-     ACTIONS
-  ======================= */
+
+
+
   const play = (i) => {
-    if (gameEnded) return;
-    if (turn !== symbol) return;
+    if (!isMyTurn) return;
     socket.emit("play", i);
   };
 
@@ -76,86 +62,58 @@ export default function App() {
     setMsg("");
   };
 
-  const rematch = () => socket.emit("rematch");
-
-  /* =======================
-     UI
-  ======================= */
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center p-4 gap-6">
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center gap-6 p-4">
 
       <h1 className="text-3xl font-bold">Tic Tac Toe</h1>
 
-      <p>
-        Tú eres{" "}
-        <span className={symbol === "O" ? "text-blue-400" : "text-red-400"}>
-          {symbol || "?"}
-        </span>
-      </p>
+      <p>Tu símbolo: <b>{symbol ?? "?"}</b></p>
+      {!gameEnded && <p>Turno: {turn}</p>}
 
-      {!gameEnded && (
-        <p>
-          Turno:{" "}
-          <span className={turn === "O" ? "text-blue-400" : "text-red-400"}>
-            {turn}
-          </span>
-        </p>
-      )}
-
-      {/* TABLERO */}
       <div className="grid grid-cols-3 gap-3">
         {board.map((cell, i) => (
-          <button
-            key={i}
-            onClick={() => play(i)}
-            disabled={cell || turn !== symbol || gameEnded}
-            className={`
-              w-24 h-24 flex items-center justify-center
-              text-5xl font-bold rounded-xl
-              ${cell === "O" ? "text-blue-400" : cell === "X" ? "text-red-400" : ""}
-              ${cell ? "bg-slate-700" : "bg-slate-800 hover:bg-slate-700"}
-            `}
-          >
-            {cell}
-          </button>
+         <button
+          key={i}
+          onClick={() => play(i)}
+          disabled={cell || !isMyTurn}
+          className={`w-24 h-24 bg-slate-800 rounded-xl text-5xl font-bold ${
+            cell === "O" ? "text-blue-400" : cell === "X" ? "text-red-500" : "text-white"
+          }`}
+        >
+          {cell}
+        </button>
         ))}
       </div>
 
-      {/* RESULTADO */}
       {result && (
         <div className="text-center space-y-2">
-          {result === "win" && <p className="text-green-400 text-2xl">🎉 Ganaste</p>}
-          {result === "lose" && <p className="text-red-400 text-2xl">❌ Perdiste</p>}
-          {result === "draw" && <p className="text-yellow-400 text-2xl">🤝 Empate</p>}
-          <button
-            onClick={rematch}
-            className="bg-green-500 px-6 py-2 rounded-xl"
-          >
-            🔁 Revancha
+          {result === "win" && <p className="text-green-400">Ganaste 🎉</p>}
+          {result === "lose" && <p className="text-red-400">Perdiste ❌</p>}
+          {result === "draw" && <p className="text-yellow-400">Empate 🤝</p>}
+          <button onClick={() => socket.emit("rematch")} className="bg-green-500 px-4 py-2 rounded-xl">
+            Revancha
           </button>
         </div>
       )}
 
-      {/* CHAT */}
-      <div className="w-full max-w-md bg-slate-800 rounded-xl p-4 flex flex-col gap-3">
-        <div className="flex-1 overflow-y-auto bg-slate-900 p-2 rounded-lg text-sm">
-          {chat.map((m, i) => (
-            <div key={i}>{m}</div>
-          ))}
+      <div className="w-full max-w-md bg-slate-800 rounded-xl p-3">
+        <div className="h-32 overflow-y-auto bg-slate-900 p-2 rounded">
+          {chat.map((m, i) => <div key={i}>{m}</div>)}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-2">
           <input
             value={msg}
             onChange={e => setMsg(e.target.value)}
-            className="flex-1 bg-slate-700 rounded-lg px-3 py-2"
+            className="flex-1 bg-slate-700 px-3 py-2 rounded"
             placeholder="Mensaje..."
           />
-          <button onClick={sendMsg} className="bg-blue-500 px-4 rounded-lg">
+          <button onClick={sendMsg} className="bg-blue-500 px-4 rounded">
             Enviar
           </button>
         </div>
       </div>
+
     </div>
   );
 }
